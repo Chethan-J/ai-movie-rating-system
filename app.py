@@ -63,14 +63,6 @@ st.markdown("""
     margin-bottom: 30px;
 }
 
-.movie-option {
-    padding: 12px;
-    border-radius: 15px;
-    border: 1px solid #263b63;
-    background: rgba(13, 27, 51, 0.75);
-    min-height: 380px;
-}
-
 .rating-card {
     padding: 18px;
     border-radius: 12px;
@@ -153,12 +145,17 @@ st.markdown(
 
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("movie_rating_bilstm.keras")
+    return tf.keras.models.load_model(
+        "movie_rating_bilstm.keras"
+    )
 
 
 @st.cache_resource
 def load_tokenizer():
-    with open("movie_rating_tokenizer.pkl", "rb") as f:
+    with open(
+        "movie_rating_tokenizer.pkl",
+        "rb"
+    ) as f:
         return pickle.load(f)
 
 
@@ -171,10 +168,27 @@ tokenizer = load_tokenizer()
 # ============================================================
 
 def clean_text(text):
+
     text = text.lower()
-    text = re.sub(r"<br />", " ", text)
-    text = re.sub(r"[^a-zA-Z\s]", "", text)
-    text = re.sub(r"\s+", " ", text)
+
+    text = re.sub(
+        r"<br />",
+        " ",
+        text
+    )
+
+    text = re.sub(
+        r"[^a-zA-Z\s]",
+        "",
+        text
+    )
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
+
     return text.strip()
 
 
@@ -183,6 +197,7 @@ def clean_text(text):
 # ============================================================
 
 def tmdb_search(query, page=1):
+
     api_key = st.secrets["TMDB_API_KEY"]
 
     url = "https://api.themoviedb.org/3/search/movie"
@@ -195,6 +210,7 @@ def tmdb_search(query, page=1):
     }
 
     try:
+
         response = requests.get(
             url,
             params=params,
@@ -205,13 +221,14 @@ def tmdb_search(query, page=1):
             return response.json()
 
     except Exception:
+
         return None
 
     return None
 
 
 # ============================================================
-# GET MOVIE SEARCH RESULTS
+# SEARCH MULTIPLE MOVIES
 # ============================================================
 
 def search_movies(movie_name):
@@ -224,13 +241,17 @@ def search_movies(movie_name):
     candidates = {}
 
     # --------------------------------------------------------
-    # 1. Search the complete phrase
+    # Search complete movie name
     # --------------------------------------------------------
 
     data = tmdb_search(movie_name)
 
     if data:
-        for movie in data.get("results", [])[:10]:
+
+        for movie in data.get(
+            "results",
+            []
+        )[:10]:
 
             movie_id = movie.get("id")
 
@@ -239,14 +260,13 @@ def search_movies(movie_name):
 
 
     # --------------------------------------------------------
-    # 2. Search individual words
+    # Search individual words
     # --------------------------------------------------------
 
     words = movie_name.split()
 
     for word in words:
 
-        # Ignore extremely short words
         if len(word) < 3:
             continue
 
@@ -254,7 +274,10 @@ def search_movies(movie_name):
 
         if data:
 
-            for movie in data.get("results", [])[:10]:
+            for movie in data.get(
+                "results",
+                []
+            )[:10]:
 
                 movie_id = movie.get("id")
 
@@ -262,11 +285,9 @@ def search_movies(movie_name):
                     candidates[movie_id] = movie
 
 
-    # --------------------------------------------------------
-    # Return results
-    # --------------------------------------------------------
-
-    return list(candidates.values())[:10]
+    return list(
+        candidates.values()
+    )[:10]
 
 
 # ============================================================
@@ -284,12 +305,14 @@ if "search_performed" not in st.session_state:
 
 
 # ============================================================
-# MOVIE SEARCH
+# MOVIE SEARCH SECTION
 # ============================================================
 
 st.subheader("🔎 Find a Movie")
 
-search_col, button_col = st.columns([5, 1])
+search_col, button_col = st.columns(
+    [5, 1]
+)
 
 with search_col:
 
@@ -308,26 +331,32 @@ with button_col:
 
 
 # ============================================================
-# PERFORM SEARCH
+# SEARCH BUTTON
 # ============================================================
 
 if search_clicked:
 
     if movie_name.strip() == "":
 
-        st.warning("Please enter a movie name.")
+        st.warning(
+            "Please enter a movie name."
+        )
 
     else:
 
-        results = search_movies(movie_name)
+        results = search_movies(
+            movie_name
+        )
 
         st.session_state.search_results = results
+
         st.session_state.search_performed = True
+
         st.session_state.movie = None
 
 
 # ============================================================
-# SHOW SEARCH RESULTS
+# DISPLAY SEARCH RESULTS
 # ============================================================
 
 if (
@@ -345,23 +374,27 @@ if (
 
     else:
 
-        st.markdown("### 🎬 Select Your Movie")
-
-        st.caption(
-            "We found these movies related to your search. "
-            "Select the movie you want to analyze."
+        st.markdown(
+            "### 🎬 Select Your Movie"
         )
 
-        # Show maximum 5 options at once
+        st.caption(
+            "Choose the movie you want to analyze."
+        )
+
         results = results[:5]
 
-        columns = st.columns(len(results))
+        columns = st.columns(
+            len(results)
+        )
 
         for i, movie in enumerate(results):
 
             with columns[i]:
 
-                poster_path = movie.get("poster_path")
+                poster_path = movie.get(
+                    "poster_path"
+                )
 
                 if poster_path:
 
@@ -388,7 +421,7 @@ if (
                             border-radius:10px;
                             color:#8998b5;
                         ">
-                        🎬<br>No Poster
+                            🎬 No Poster
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -425,7 +458,9 @@ if (
                 ):
 
                     st.session_state.movie = movie
+
                     st.session_state.search_results = []
+
                     st.rerun()
 
 
@@ -443,9 +478,13 @@ if movie is not None:
         unsafe_allow_html=True
     )
 
-    poster_path = movie.get("poster_path")
+    poster_path = movie.get(
+        "poster_path"
+    )
 
-    movie_col1, movie_col2 = st.columns([1, 2])
+    movie_col1, movie_col2 = st.columns(
+        [1, 2]
+    )
 
     with movie_col1:
 
@@ -463,8 +502,9 @@ if movie is not None:
 
         else:
 
-            st.info("Poster not available.")
-
+            st.info(
+                "Poster not available."
+            )
 
     with movie_col2:
 
@@ -483,7 +523,7 @@ if movie is not None:
             "No description available."
         )
 
-        rating = movie.get(
+        tmdb_rating = movie.get(
             "vote_average",
             0
         )
@@ -497,10 +537,13 @@ if movie is not None:
         )
 
         st.markdown(
-            f"**TMDB Rating:** ⭐ {rating}/10"
+            f"**TMDB Rating:** ⭐ "
+            f"{tmdb_rating}/10"
         )
 
-        st.write(overview)
+        st.write(
+            overview
+        )
 
     st.markdown(
         "</div>",
@@ -509,10 +552,12 @@ if movie is not None:
 
 
     # ========================================================
-    # REVIEW INPUT
+    # REVIEW SECTION
     # ========================================================
 
-    st.subheader("📝 Enter Movie Reviews")
+    st.subheader(
+        "📝 Enter Movie Reviews"
+    )
 
     review_count = st.number_input(
         "Number of Reviews",
@@ -524,16 +569,24 @@ if movie is not None:
 
     reviews = []
 
-    for row_start in range(0, review_count, 3):
+    for row_start in range(
+        0,
+        review_count,
+        3
+    ):
 
         row_count = min(
             3,
             review_count - row_start
         )
 
-        cols = st.columns(row_count)
+        cols = st.columns(
+            row_count
+        )
 
-        for i in range(row_count):
+        for i in range(
+            row_count
+        ):
 
             index = row_start + i + 1
 
@@ -548,7 +601,9 @@ if movie is not None:
                     key=f"review_{index}"
                 )
 
-                reviews.append(review)
+                reviews.append(
+                    review
+                )
 
 
     # ========================================================
@@ -562,7 +617,7 @@ if movie is not None:
 
 
     # ========================================================
-    # PREDICTIONS
+    # PREDICT RATINGS
     # ========================================================
 
     if analyze_clicked:
@@ -585,10 +640,14 @@ if movie is not None:
 
             for review in valid_reviews:
 
-                cleaned = clean_text(review)
+                cleaned = clean_text(
+                    review
+                )
 
-                sequence = tokenizer.texts_to_sequences(
-                    [cleaned]
+                sequence = (
+                    tokenizer.texts_to_sequences(
+                        [cleaned]
+                    )
                 )
 
                 padded = pad_sequences(
@@ -605,21 +664,27 @@ if movie is not None:
                     )[0][0]
                 )
 
-                # Keep score inside IMDb range
+                # Keep prediction between 1 and 10
                 predicted_score = max(
                     1.0,
-                    min(10.0, predicted_score)
+                    min(
+                        10.0,
+                        predicted_score
+                    )
                 )
 
-                # Convert 1-10 score to
-                # half-star 0.5-5.0 rating
-                star_rating = round(
-                    predicted_score
-                ) / 2
+                # Convert IMDb 1-10
+                # to half-star 0.5-5.0
+                star_rating = (
+                    round(predicted_score) / 2
+                )
 
                 star_rating = max(
                     0.5,
-                    min(5.0, star_rating)
+                    min(
+                        5.0,
+                        star_rating
+                    )
                 )
 
                 predictions.append(
@@ -636,29 +701,58 @@ if movie is not None:
             )
 
             result_columns = st.columns(
-                min(3, len(predictions))
+                min(
+                    3,
+                    len(predictions)
+                )
             )
 
-            for i, rating in enumerate(predictions):
+            for i, rating in enumerate(
+                predictions
+            ):
 
                 with result_columns[
                     i % len(result_columns)
                 ]:
 
+                    full_stars = int(
+                        rating
+                    )
+
+                    half_star = (
+                        rating % 1 == 0.5
+                    )
+
+                    stars = (
+                        "⭐" * full_stars
+                    )
+
+                    if half_star:
+                        stars += "½"
+
                     st.markdown(
                         f"""
                         <div class="rating-card">
-                            <h3>Review {i + 1}</h3>
+
+                            <h3>
+                                Review {i + 1}
+                            </h3>
+
                             <div style="
-                                font-size:35px;
+                                font-size:32px;
                                 margin-top:15px;
                             ">
-                                {"⭐" * int(rating)}
+                                {stars}
                             </div>
-                            <h2>{rating:.1f} / 5</h2>
+
+                            <h2>
+                                {rating:.1f} / 5
+                            </h2>
+
                             <p>
                                 AI predicted rating
                             </p>
+
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -669,19 +763,29 @@ if movie is not None:
             # OVERALL RATING
             # ====================================================
 
-            overall_rating = sum(
-                predictions
-            ) / len(predictions)
+            overall_rating = (
+                sum(predictions)
+                / len(predictions)
+            )
 
-            # Round to nearest half star
+            # Round overall rating
+            # to nearest half star
             overall_rating = round(
                 overall_rating * 2
             ) / 2
 
             overall_rating = max(
                 0.5,
-                min(5.0, overall_rating)
+                min(
+                    5.0,
+                    overall_rating
+                )
             )
+
+
+            # ====================================================
+            # OVERALL STAR DISPLAY
+            # ====================================================
 
             full_stars = int(
                 overall_rating
@@ -691,12 +795,17 @@ if movie is not None:
                 overall_rating % 1 == 0.5
             )
 
-            stars = "⭐" * full_stars
+            stars = (
+                "⭐" * full_stars
+            )
 
             if half_star:
+                stars += "½"
 
-                stars += "✨"
 
+            # ====================================================
+            # OVERALL CARD
+            # ====================================================
 
             st.markdown(
                 f"""
@@ -724,7 +833,8 @@ if movie is not None:
                         margin-top:10px;
                         color:#aab8d4;
                     ">
-                        Based on {len(predictions)}
+                        Based on
+                        {len(predictions)}
                         review(s)
                     </div>
 
