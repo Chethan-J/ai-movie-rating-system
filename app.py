@@ -4,6 +4,7 @@ import pickle
 import re
 import numpy as np
 import requests
+from rapidfuzz import fuzz
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 # ============================================================
@@ -23,8 +24,6 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-/* ==================== BACKGROUND ==================== */
-
 .stApp {
     background: linear-gradient(
         135deg,
@@ -38,8 +37,6 @@ st.markdown("""
 [data-testid="stHeader"] {
     background: transparent;
 }
-
-/* ==================== TITLE ==================== */
 
 .main-title {
     text-align: center;
@@ -56,8 +53,6 @@ st.markdown("""
     margin-bottom: 30px;
 }
 
-/* ==================== MOVIE CARD ==================== */
-
 .movie-card {
     padding: 20px;
     border-radius: 15px;
@@ -67,8 +62,6 @@ st.markdown("""
     margin-bottom: 30px;
 }
 
-/* ==================== RATING CARD ==================== */
-
 .rating-card {
     padding: 18px;
     border-radius: 12px;
@@ -77,8 +70,6 @@ st.markdown("""
     margin-bottom: 15px;
     min-height: 240px;
 }
-
-/* ==================== OVERALL CARD ==================== */
 
 .overall-card {
     text-align: center;
@@ -99,8 +90,6 @@ st.markdown("""
     font-weight: 700;
 }
 
-/* ==================== INPUTS ==================== */
-
 .stTextInput input,
 .stTextArea textarea,
 .stNumberInput input {
@@ -114,8 +103,6 @@ st.markdown("""
 .stTextArea textarea::placeholder {
     color: #8b98b5 !important;
 }
-
-/* ==================== BUTTON ==================== */
 
 .stButton > button {
     width: 100%;
@@ -140,8 +127,6 @@ st.markdown("""
     );
     color: white;
 }
-
-/* ==================== FOOTER ==================== */
 
 .tmdb-note {
     text-align: center;
@@ -191,10 +176,10 @@ model = load_model()
 tokenizer = load_tokenizer()
 
 # ============================================================
-# TMDB SEARCH
+# TMDB API REQUEST
 # ============================================================
 
-def search_movie(movie_name):
+def tmdb_search(query, page=1):
 
     api_key = st.secrets["TMDB_API_KEY"]
 
@@ -202,7 +187,8 @@ def search_movie(movie_name):
 
     params = {
         "api_key": api_key,
-        "query": movie_name
+        "query": query,
+        "page": page
     }
 
     response = requests.get(
@@ -212,12 +198,113 @@ def search_movie(movie_name):
 
     if response.status_code == 200:
 
-        data = response.json()
-
-        if data["results"]:
-            return data["results"][0]
+        return response.json()
 
     return None
+
+# ============================================================
+# SMART MOVIE SEARCH
+# ============================================================
+
+def search_movie(movie_name):
+
+    # --------------------------------------------------------
+    # STEP 1: Normal TMDB search
+    # --------------------------------------------------------
+
+    data = tmdb_search(
+        movie_name
+    )
+
+    if data and data.get("results"):
+
+        return data["results"][0], False
+
+    # --------------------------------------------------------
+    # STEP 2: If nothing found, use the first word
+    # --------------------------------------------------------
+
+    words = movie_name.strip().split()
+
+    if not words:
+        return None, False
+
+    fallback_query = words[0]
+
+    fallback_results = []
+
+    # Search first 5 pages for possible titles
+    for page in range(1, 6):
+
+        data = tmdb_search(
+            fallback_query,
+            page
+        )
+
+        if not data:
+            break
+
+        results = data.get(
+            "results",
+            []
+        )
+
+        fallback_results.extend(
+            results
+        )
+
+        if len(results) == 0:
+            break
+
+    # --------------------------------------------------------
+    # STEP 3: Compare user's text with movie titles
+    # --------------------------------------------------------
+
+    best_movie = None
+    best_score = 0
+
+    for movie in fallback_results:
+
+        title = movie.get(
+            "title",
+            ""
+        )
+
+        original_title = movie.get(
+            "original_title",
+            ""
+        )
+
+        # Compare with both title versions
+        score1 = fuzz.ratio(
+            movie_name.lower(),
+            title.lower()
+        )
+
+        score2 = fuzz.ratio(
+            movie_name.lower(),
+            original_title.lower()
+        )
+
+        score = max(
+            score1,
+            score2
+        )
+
+        if score > best_score:
+
+            best_score = score
+            best_movie = movie
+
+    # --------------------------------------------------------
+    # STEP 4: Accept only a reasonably close match
+    # --------------------------------------------------------
+
+    if best_movie and best_score >= 45:
+
+        return best_movie, True
+
+    return None, False
 
 # ============================================================
 # TEXT CLEANING
@@ -248,7 +335,7 @@ def clean_text(text):
     return text.strip()
 
 # ============================================================
-# MOVIE SEARCH
+# MOVIE SEARCH UI
 # ============================================================
 
 st.subheader("🔎 Find a Movie")
@@ -279,6 +366,9 @@ with button_col:
 if "movie" not in st.session_state:
     st.session_state.movie = None
 
+if "corrected_search" not in st.session_state:
+    st.session_state.corrected_search = False
+
 if search_clicked:
 
     if movie_name.strip() == "":
@@ -289,9 +379,12 @@ if search_clicked:
 
     else:
 
-        st.session_state.movie = search_movie(
+        movie, corrected = search_movie(
             movie_name
         )
+
+        st.session_state.movie = movie
+        st.session_state.corrected_search = corrected
 
 movie = st.session_state.movie
 
@@ -300,6 +393,13 @@ movie = st.session_state.movie
 # ============================================================
 
 if movie:
+
+    if st.session_state.corrected_search:
+
+        st.info(
+            f"Showing the closest match: "
+            f"**{movie.get('title', 'Movie')}**"
+        )
 
     st.markdown(
         '<div class="movie-card">',
@@ -310,9 +410,9 @@ if movie:
         [1, 3]
     )
 
-    # -------------------------
+    # --------------------------------------------------------
     # POSTER
-    # -------------------------
+    # --------------------------------------------------------
 
     if movie.get("poster_path"):
 
@@ -328,9 +428,9 @@ if movie:
                 width=280
             )
 
-    # -------------------------
+    # --------------------------------------------------------
     # MOVIE DETAILS
-    # -------------------------
+    # --------------------------------------------------------
 
     with info_col:
 
@@ -394,12 +494,14 @@ review_count = st.number_input(
 )
 
 # ============================================================
-# REVIEW INPUTS — SIDE BY SIDE
+# REVIEW INPUTS
 # ============================================================
 
 reviews = []
 
-review_count = int(review_count)
+review_count = int(
+    review_count
+)
 
 for start in range(
     0,
@@ -469,14 +571,13 @@ if analyze_clicked:
         ratings = []
         scores = []
 
-        # NO DIVIDER HERE
         st.subheader(
             "📊 Individual Review Ratings"
         )
 
-        # ====================================================
+        # ----------------------------------------------------
         # PREDICT EACH REVIEW
-        # ====================================================
+        # ----------------------------------------------------
 
         for review in valid_reviews:
 
@@ -530,9 +631,9 @@ if analyze_clicked:
                 predicted_score
             )
 
-        # ====================================================
-        # DISPLAY RATINGS SIDE BY SIDE
-        # ====================================================
+        # ----------------------------------------------------
+        # DISPLAY RATINGS
+        # ----------------------------------------------------
 
         result_columns = st.columns(
             min(
@@ -577,9 +678,9 @@ if analyze_clicked:
                     unsafe_allow_html=True
                 )
 
-        # ====================================================
+        # ----------------------------------------------------
         # OVERALL RATING
-        # ====================================================
+        # ----------------------------------------------------
 
         overall_rating = (
             sum(ratings)
