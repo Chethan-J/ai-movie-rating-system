@@ -15,11 +15,18 @@ st.title("🎬 AI Movie Rating System")
 st.write("Enter a movie review to predict its rating.")
 
 # Load model
-model = tf.keras.models.load_model("movie_rating_bilstm.keras")
+@st.cache_resource
+def load_model():
+    return tf.keras.models.load_model("movie_rating_bilstm.keras")
 
 # Load tokenizer
-with open("movie_rating_tokenizer.pkl", "rb") as f:
-    tokenizer = pickle.load(f)
+@st.cache_resource
+def load_tokenizer():
+    with open("movie_rating_tokenizer.pkl", "rb") as f:
+        return pickle.load(f)
+
+model = load_model()
+tokenizer = load_tokenizer()
 
 # Text cleaning
 def clean_text(text):
@@ -42,10 +49,13 @@ if st.button("Predict Rating"):
         st.warning("Please enter a review.")
 
     else:
+        # Clean review
         cleaned_review = clean_text(review)
 
+        # Convert text to sequence
         sequence = tokenizer.texts_to_sequences([cleaned_review])
 
+        # Padding
         padded_review = pad_sequences(
             sequence,
             maxlen=200,
@@ -53,6 +63,7 @@ if st.button("Predict Rating"):
             truncating="post"
         )
 
+        # Predict IMDb score
         prediction = model.predict(
             padded_review,
             verbose=0
@@ -62,9 +73,13 @@ if st.button("Predict Rating"):
             np.clip(prediction[0][0], 1, 10)
         )
 
-        # Convert 1–10 score to nearest 0.5 star
-        star_rating = round(predicted_score * 2) / 4
+        # Convert IMDb score to nearest 0.5 star
+        star_rating = round(predicted_score / 2 * 2) / 2
 
+        # Keep rating between 0.5 and 5
+        star_rating = max(0.5, min(5.0, star_rating))
+
+        # Display result
         st.subheader("Prediction")
 
         st.write(
