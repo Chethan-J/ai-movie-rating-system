@@ -3,4 +3,3 @@ tensorflow==2.21.0
 numpy
 scikit-learn
 requests
-rapidfuzz
