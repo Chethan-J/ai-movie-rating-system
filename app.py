@@ -67,7 +67,7 @@ st.markdown("""
     margin-bottom: 30px;
 }
 
-/* ==================== REVIEW CARD ==================== */
+/* ==================== RATING CARD ==================== */
 
 .rating-card {
     padding: 18px;
@@ -75,6 +75,7 @@ st.markdown("""
     border: 1px solid #263b63;
     background: rgba(13, 27, 51, 0.75);
     margin-bottom: 15px;
+    min-height: 240px;
 }
 
 /* ==================== OVERALL CARD ==================== */
@@ -138,12 +139,6 @@ st.markdown("""
         #8b5cf6
     );
     color: white;
-}
-
-/* ==================== DIVIDER ==================== */
-
-hr {
-    border-color: #263b63;
 }
 
 /* ==================== FOOTER ==================== */
@@ -277,7 +272,10 @@ with button_col:
         use_container_width=True
     )
 
-# Store movie result
+# ============================================================
+# STORE MOVIE RESULT
+# ============================================================
+
 if "movie" not in st.session_state:
     st.session_state.movie = None
 
@@ -403,7 +401,6 @@ reviews = []
 
 review_count = int(review_count)
 
-# Create rows of 3 reviews
 for start in range(
     0,
     review_count,
@@ -429,9 +426,7 @@ for start in range(
 
             review = st.text_area(
                 f"Review {index + 1}",
-                placeholder=(
-                    "Enter your movie review..."
-                ),
+                placeholder="Enter your movie review...",
                 height=150,
                 key=f"review_{index}"
             )
@@ -474,8 +469,7 @@ if analyze_clicked:
         ratings = []
         scores = []
 
-        st.divider()
-
+        # NO DIVIDER HERE
         st.subheader(
             "📊 Individual Review Ratings"
         )
@@ -541,9 +535,10 @@ if analyze_clicked:
         # ====================================================
 
         result_columns = st.columns(
-            len(valid_reviews)
-            if len(valid_reviews) <= 3
-            else 3
+            min(
+                len(valid_reviews),
+                3
+            )
         )
 
         for i, rating in enumerate(
@@ -570,7 +565,7 @@ if analyze_clicked:
                     {rating:.1f} / 5
                     </strong>
 
-                    <br>
+                    <br><br>
 
                     <span style="color:#9caac4;">
                     IMDb Score:
