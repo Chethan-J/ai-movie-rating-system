@@ -22,39 +22,74 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+
+/* ==================== MAIN BACKGROUND ==================== */
+
+.stApp {
+    background: linear-gradient(
+        135deg,
+        #050b18 0%,
+        #0b1630 50%,
+        #111827 100%
+    );
+    color: white;
+}
+
+/* ==================== HEADER ==================== */
+
+[data-testid="stHeader"] {
+    background: transparent;
+}
+
+/* ==================== MAIN TITLE ==================== */
+
 .main-title {
     text-align: center;
     font-size: 42px;
     font-weight: 700;
+    margin-top: 10px;
     margin-bottom: 5px;
 }
 
 .subtitle {
     text-align: center;
     font-size: 18px;
-    color: #777;
+    color: #aab7d4;
     margin-bottom: 30px;
 }
+
+/* ==================== MOVIE CARD ==================== */
 
 .movie-card {
     padding: 20px;
     border-radius: 15px;
-    border: 1px solid rgba(128,128,128,0.25);
+    border: 1px solid #263b63;
+    background: rgba(13, 27, 51, 0.75);
     margin-bottom: 25px;
 }
+
+/* ==================== RATING CARD ==================== */
 
 .rating-card {
     padding: 18px;
     border-radius: 12px;
-    border: 1px solid rgba(128,128,128,0.25);
+    border: 1px solid #263b63;
+    background: rgba(13, 27, 51, 0.75);
     margin-bottom: 12px;
 }
+
+/* ==================== OVERALL RATING ==================== */
 
 .overall-rating {
     text-align: center;
     padding: 25px;
     border-radius: 18px;
-    border: 2px solid rgba(128,128,128,0.25);
+    border: 2px solid #536dfe;
+    background: linear-gradient(
+        135deg,
+        rgba(27, 52, 100, 0.8),
+        rgba(53, 40, 110, 0.8)
+    );
     margin-top: 25px;
 }
 
@@ -63,12 +98,70 @@ st.markdown("""
     font-weight: 700;
 }
 
+/* ==================== INPUT BOXES ==================== */
+
+.stTextInput input,
+.stTextArea textarea,
+.stNumberInput input {
+    background-color: #111c33 !important;
+    color: white !important;
+    border: 1px solid #36527d !important;
+    border-radius: 10px !important;
+}
+
+.stTextInput input::placeholder,
+.stTextArea textarea::placeholder {
+    color: #8b98b5 !important;
+}
+
+/* ==================== BUTTON ==================== */
+
+.stButton > button {
+    width: 100%;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(
+        90deg,
+        #168cff,
+        #7654ff
+    );
+    color: white;
+    font-size: 17px;
+    font-weight: 600;
+    padding: 12px;
+}
+
+.stButton > button:hover {
+    background: linear-gradient(
+        90deg,
+        #287cff,
+        #8b5cf6
+    );
+    color: white;
+}
+
+/* ==================== DIVIDER ==================== */
+
+hr {
+    border-color: #263b63;
+}
+
+/* ==================== TMDB FOOTER ==================== */
+
 .tmdb-note {
     text-align: center;
-    color: #777;
+    color: #7f8ba3;
     font-size: 13px;
     margin-top: 30px;
+    margin-bottom: 10px;
 }
+
+/* ==================== SIDEBAR ==================== */
+
+[data-testid="stSidebar"] {
+    background: #050b18;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -94,11 +187,16 @@ st.markdown(
 
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model("movie_rating_bilstm.keras")
+    return tf.keras.models.load_model(
+        "movie_rating_bilstm.keras"
+    )
 
 @st.cache_resource
 def load_tokenizer():
-    with open("movie_rating_tokenizer.pkl", "rb") as f:
+    with open(
+        "movie_rating_tokenizer.pkl",
+        "rb"
+    ) as f:
         return pickle.load(f)
 
 model = load_model()
@@ -119,7 +217,10 @@ def search_movie(movie_name):
         "query": movie_name
     }
 
-    response = requests.get(url, params=params)
+    response = requests.get(
+        url,
+        params=params
+    )
 
     if response.status_code == 200:
 
@@ -137,9 +238,24 @@ def search_movie(movie_name):
 def clean_text(text):
 
     text = text.lower()
-    text = re.sub(r"<br />", " ", text)
-    text = re.sub(r"[^a-zA-Z\s]", "", text)
-    text = re.sub(r"\s+", " ", text)
+
+    text = re.sub(
+        r"<br />",
+        " ",
+        text
+    )
+
+    text = re.sub(
+        r"[^a-zA-Z\s]",
+        "",
+        text
+    )
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text
+    )
 
     return text.strip()
 
@@ -159,7 +275,9 @@ movie = None
 
 if movie_name:
 
-    movie = search_movie(movie_name)
+    movie = search_movie(
+        movie_name
+    )
 
     if movie:
 
@@ -168,9 +286,14 @@ if movie_name:
             unsafe_allow_html=True
         )
 
-        col1, col2 = st.columns([1, 2])
+        col1, col2 = st.columns(
+            [1, 2]
+        )
 
-        # Movie poster
+        # ========================
+        # MOVIE POSTER
+        # ========================
+
         if movie.get("poster_path"):
 
             poster_url = (
@@ -179,12 +302,16 @@ if movie_name:
             )
 
             with col1:
+
                 st.image(
                     poster_url,
                     width=280
                 )
 
-        # Movie information
+        # ========================
+        # MOVIE INFORMATION
+        # ========================
+
         with col2:
 
             st.markdown(
@@ -199,7 +326,8 @@ if movie_name:
             if release_date:
 
                 st.write(
-                    f"📅 **Release Date:** {release_date}"
+                    f"📅 **Release Date:** "
+                    f"{release_date}"
                 )
 
             overview = movie.get(
@@ -221,14 +349,17 @@ if movie_name:
     else:
 
         st.warning(
-            "Movie not found. Try another movie name."
+            "Movie not found. "
+            "Try another movie name."
         )
 
 # ============================================================
-# REVIEWS
+# REVIEW SECTION
 # ============================================================
 
-st.subheader("📝 Analyze Movie Reviews")
+st.subheader(
+    "📝 Analyze Movie Reviews"
+)
 
 st.write(
     "Enter one or more reviews to generate "
@@ -245,7 +376,9 @@ review_count = st.number_input(
 
 reviews = []
 
-for i in range(review_count):
+for i in range(
+    int(review_count)
+):
 
     review = st.text_area(
         f"Review {i + 1}",
@@ -253,10 +386,12 @@ for i in range(review_count):
         key=f"review_{i}"
     )
 
-    reviews.append(review)
+    reviews.append(
+        review
+    )
 
 # ============================================================
-# ANALYZE BUTTON
+# ANALYZE REVIEWS
 # ============================================================
 
 if st.button(
@@ -290,14 +425,18 @@ if st.button(
         # INDIVIDUAL PREDICTIONS
         # ====================================================
 
-        for i, review in enumerate(valid_reviews):
+        for i, review in enumerate(
+            valid_reviews
+        ):
 
             cleaned_review = clean_text(
                 review
             )
 
-            sequence = tokenizer.texts_to_sequences(
-                [cleaned_review]
+            sequence = (
+                tokenizer.texts_to_sequences(
+                    [cleaned_review]
+                )
             )
 
             padded_review = pad_sequences(
@@ -320,13 +459,19 @@ if st.button(
                 )
             )
 
+            # Convert IMDb score
+            # to nearest 0.5 star
+
             star_rating = (
                 round(predicted_score) / 2
             )
 
             star_rating = max(
                 0.5,
-                min(5.0, star_rating)
+                min(
+                    5.0,
+                    star_rating
+                )
             )
 
             ratings.append(
@@ -336,11 +481,22 @@ if st.button(
             st.markdown(
                 f"""
                 <div class="rating-card">
-                    <b>Review {i + 1}</b>
-                    <br><br>
-                    ⭐ <strong>{star_rating:.1f} / 5</strong>
-                    <br>
-                    IMDb Score: {predicted_score:.2f} / 10
+
+                <b>Review {i + 1}</b>
+
+                <br><br>
+
+                ⭐ <strong>
+                {star_rating:.1f} / 5
+                </strong>
+
+                <br>
+
+                <span style="color:#9caac4;">
+                IMDb Score:
+                {predicted_score:.2f} / 10
+                </span>
+
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -351,23 +507,34 @@ if st.button(
         # ====================================================
 
         overall_rating = (
-            sum(ratings) / len(ratings)
+            sum(ratings)
+            / len(ratings)
         )
 
         overall_rating = (
-            round(overall_rating * 2) / 2
+            round(
+                overall_rating * 2
+            ) / 2
         )
 
         st.markdown(
             f"""
             <div class="overall-rating">
-                <h2>🏆 Overall Movie Rating</h2>
+
+                <h2>
+                    🏆 Overall Movie Rating
+                </h2>
+
                 <div class="overall-number">
                     ⭐ {overall_rating:.1f} / 5
                 </div>
+
                 <p>
-                    Based on {len(valid_reviews)} review(s)
+                    Based on
+                    {len(valid_reviews)}
+                    review(s)
                 </p>
+
             </div>
             """,
             unsafe_allow_html=True
@@ -380,8 +547,10 @@ if st.button(
 st.markdown(
     """
     <div class="tmdb-note">
-        This product uses the TMDB API but is not endorsed
-        or certified by TMDB.
+
+    This product uses the TMDB API but is not endorsed
+    or certified by TMDB.
+
     </div>
     """,
     unsafe_allow_html=True
