@@ -2,7 +2,6 @@ import streamlit as st
 import tensorflow as tf
 import pickle
 import re
-import numpy as np
 import requests
 
 from tensorflow.keras.preprocessing.sequence import pad_sequences
@@ -61,34 +60,6 @@ st.markdown("""
     background: rgba(13, 27, 51, 0.75);
     margin-top: 15px;
     margin-bottom: 30px;
-}
-
-.rating-card {
-    padding: 18px;
-    border-radius: 12px;
-    border: 1px solid #263b63;
-    background: rgba(13, 27, 51, 0.75);
-    margin-bottom: 15px;
-    min-height: 240px;
-}
-
-.overall-card {
-    text-align: center;
-    padding: 25px;
-    border-radius: 18px;
-    border: 2px solid #536dfe;
-    background: linear-gradient(
-        135deg,
-        rgba(27, 52, 100, 0.8),
-        rgba(53, 40, 110, 0.8)
-    );
-    margin-top: 25px;
-    margin-bottom: 25px;
-}
-
-.overall-rating {
-    font-size: 45px;
-    font-weight: 700;
 }
 
 .tmdb-note {
@@ -305,7 +276,7 @@ if "search_performed" not in st.session_state:
 
 
 # ============================================================
-# MOVIE SEARCH SECTION
+# FIND A MOVIE
 # ============================================================
 
 st.subheader("🔎 Find a Movie")
@@ -331,7 +302,7 @@ with button_col:
 
 
 # ============================================================
-# SEARCH BUTTON
+# SEARCH
 # ============================================================
 
 if search_clicked:
@@ -356,7 +327,7 @@ if search_clicked:
 
 
 # ============================================================
-# DISPLAY SEARCH RESULTS
+# SEARCH RESULTS
 # ============================================================
 
 if (
@@ -411,20 +382,7 @@ if (
                 else:
 
                     st.markdown(
-                        """
-                        <div style="
-                            height:250px;
-                            display:flex;
-                            align-items:center;
-                            justify-content:center;
-                            background:#111c33;
-                            border-radius:10px;
-                            color:#8998b5;
-                        ">
-                            🎬 No Poster
-                        </div>
-                        """,
-                        unsafe_allow_html=True
+                        "🎬 Poster unavailable"
                     )
 
                 title = movie.get(
@@ -552,7 +510,7 @@ if movie is not None:
 
 
     # ========================================================
-    # REVIEW SECTION
+    # REVIEW INPUT
     # ========================================================
 
     st.subheader(
@@ -607,7 +565,7 @@ if movie is not None:
 
 
     # ========================================================
-    # ANALYZE BUTTON
+    # ANALYZE REVIEWS
     # ========================================================
 
     analyze_clicked = st.button(
@@ -617,7 +575,7 @@ if movie is not None:
 
 
     # ========================================================
-    # PREDICT RATINGS
+    # PREDICTION
     # ========================================================
 
     if analyze_clicked:
@@ -640,15 +598,27 @@ if movie is not None:
 
             for review in valid_reviews:
 
+                # --------------------------------------------
+                # Clean review
+                # --------------------------------------------
+
                 cleaned = clean_text(
                     review
                 )
+
+                # --------------------------------------------
+                # Convert text to sequence
+                # --------------------------------------------
 
                 sequence = (
                     tokenizer.texts_to_sequences(
                         [cleaned]
                     )
                 )
+
+                # --------------------------------------------
+                # Padding
+                # --------------------------------------------
 
                 padded = pad_sequences(
                     sequence,
@@ -657,6 +627,10 @@ if movie is not None:
                     truncating="post"
                 )
 
+                # --------------------------------------------
+                # Model prediction
+                # --------------------------------------------
+
                 predicted_score = float(
                     model.predict(
                         padded,
@@ -664,7 +638,10 @@ if movie is not None:
                     )[0][0]
                 )
 
+                # --------------------------------------------
                 # Keep prediction between 1 and 10
+                # --------------------------------------------
+
                 predicted_score = max(
                     1.0,
                     min(
@@ -673,8 +650,10 @@ if movie is not None:
                     )
                 )
 
-                # Convert IMDb 1-10
-                # to half-star 0.5-5.0
+                # --------------------------------------------
+                # Convert 1-10 to 0.5-5 stars
+                # --------------------------------------------
+
                 star_rating = (
                     round(predicted_score) / 2
                 )
@@ -693,7 +672,7 @@ if movie is not None:
 
 
             # ====================================================
-            # INDIVIDUAL RATINGS
+            # INDIVIDUAL REVIEW RATINGS
             # ====================================================
 
             st.subheader(
@@ -731,31 +710,19 @@ if movie is not None:
                         stars += "½"
 
                     st.markdown(
-                        f"""
-                        <div class="rating-card">
+                        f"### Review {i + 1}"
+                    )
 
-                            <h3>
-                                Review {i + 1}
-                            </h3>
+                    st.markdown(
+                        f"## {stars}"
+                    )
 
-                            <div style="
-                                font-size:32px;
-                                margin-top:15px;
-                            ">
-                                {stars}
-                            </div>
+                    st.markdown(
+                        f"### {rating:.1f} / 5"
+                    )
 
-                            <h2>
-                                {rating:.1f} / 5
-                            </h2>
-
-                            <p>
-                                AI predicted rating
-                            </p>
-
-                        </div>
-                        """,
-                        unsafe_allow_html=True
+                    st.caption(
+                        "AI predicted rating"
                     )
 
 
@@ -768,8 +735,7 @@ if movie is not None:
                 / len(predictions)
             )
 
-            # Round overall rating
-            # to nearest half star
+            # Round to nearest half star
             overall_rating = round(
                 overall_rating * 2
             ) / 2
@@ -784,7 +750,7 @@ if movie is not None:
 
 
             # ====================================================
-            # OVERALL STAR DISPLAY
+            # OVERALL STARS
             # ====================================================
 
             full_stars = int(
@@ -795,52 +761,34 @@ if movie is not None:
                 overall_rating % 1 == 0.5
             )
 
-            stars = (
+            overall_stars = (
                 "⭐" * full_stars
             )
 
             if half_star:
-                stars += "½"
+                overall_stars += "½"
 
 
             # ====================================================
-            # OVERALL CARD
-            # ====================================================
+            # OVERALL RESULT
+            # ============================================================
+
+            st.markdown("---")
 
             st.markdown(
-                f"""
-                <div class="overall-card">
+                "## 🎯 Overall AI Rating"
+            )
 
-                    <div style="
-                        font-size:22px;
-                        color:#b7c5e0;
-                    ">
-                        Overall AI Rating
-                    </div>
+            st.markdown(
+                f"# {overall_rating:.1f} / 5"
+            )
 
-                    <div class="overall-rating">
-                        {overall_rating:.1f} / 5
-                    </div>
+            st.markdown(
+                f"### {overall_stars}"
+            )
 
-                    <div style="
-                        font-size:30px;
-                        margin-top:10px;
-                    ">
-                        {stars}
-                    </div>
-
-                    <div style="
-                        margin-top:10px;
-                        color:#aab8d4;
-                    ">
-                        Based on
-                        {len(predictions)}
-                        review(s)
-                    </div>
-
-                </div>
-                """,
-                unsafe_allow_html=True
+            st.caption(
+                f"Based on {len(predictions)} review(s)"
             )
 
 
