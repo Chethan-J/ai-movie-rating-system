@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 st.title("🎬 AI Movie Rating System")
-st.write("Enter a movie name and review to predict its rating.")
+st.write("Search for a movie and analyze multiple reviews.")
 
 # ============================================================
 # LOAD MODEL
@@ -70,17 +70,13 @@ def clean_text(text):
     return text.strip()
 
 # ============================================================
-# MOVIE NAME
+# MOVIE SEARCH
 # ============================================================
 
 movie_name = st.text_input(
     "🎬 Enter Movie Name",
     placeholder="Example: Interstellar"
 )
-
-# ============================================================
-# MOVIE SEARCH
-# ============================================================
 
 if movie_name:
 
@@ -90,7 +86,6 @@ if movie_name:
 
         col1, col2 = st.columns([1, 2])
 
-        # Poster
         if movie.get("poster_path"):
 
             poster_url = (
@@ -104,7 +99,6 @@ if movie_name:
                     width=250
                 )
 
-        # Movie information
         with col2:
 
             st.subheader(movie.get("title", "Movie"))
@@ -125,70 +119,110 @@ if movie_name:
         st.warning("Movie not found. Try another movie name.")
 
 # ============================================================
-# REVIEW INPUT
+# MULTIPLE REVIEWS
 # ============================================================
 
-review = st.text_area(
-    "📝 Enter Your Movie Review",
-    placeholder="Example: This movie was amazing and the acting was excellent!"
+st.subheader("📝 Enter Movie Reviews")
+
+review_count = st.number_input(
+    "Number of Reviews",
+    min_value=1,
+    max_value=10,
+    value=3,
+    step=1
 )
 
+reviews = []
+
+for i in range(review_count):
+
+    review = st.text_area(
+        f"Review {i + 1}",
+        placeholder="Enter your movie review...",
+        key=f"review_{i}"
+    )
+
+    reviews.append(review)
+
 # ============================================================
-# PREDICTION
+# PREDICT RATINGS
 # ============================================================
 
-if st.button("⭐ Predict Rating"):
+if st.button("⭐ Analyze Reviews"):
 
-    if review.strip() == "":
-        st.warning("Please enter a movie review.")
+    valid_reviews = [
+        review for review in reviews
+        if review.strip() != ""
+    ]
+
+    if len(valid_reviews) == 0:
+
+        st.warning("Please enter at least one review.")
 
     else:
 
-        # Clean review
-        cleaned_review = clean_text(review)
+        ratings = []
 
-        # Convert review into sequence
-        sequence = tokenizer.texts_to_sequences(
-            [cleaned_review]
-        )
+        st.subheader("📊 Individual Review Ratings")
 
-        # Padding
-        padded_review = pad_sequences(
-            sequence,
-            maxlen=200,
-            padding="post",
-            truncating="post"
-        )
+        for i, review in enumerate(valid_reviews):
 
-        # Predict IMDb score
-        prediction = model.predict(
-            padded_review,
-            verbose=0
-        )
+            cleaned_review = clean_text(review)
 
-        predicted_score = float(
-            np.clip(prediction[0][0], 1, 10)
-        )
+            sequence = tokenizer.texts_to_sequences(
+                [cleaned_review]
+            )
 
-        # Convert IMDb score to 0.5 - 5 star rating
-        star_rating = round(predicted_score) / 2
+            padded_review = pad_sequences(
+                sequence,
+                maxlen=200,
+                padding="post",
+                truncating="post"
+            )
 
-        star_rating = max(
-            0.5,
-            min(5.0, star_rating)
-        )
+            prediction = model.predict(
+                padded_review,
+                verbose=0
+            )
 
-        # Display result
-        st.subheader("⭐ Prediction")
+            predicted_score = float(
+                np.clip(prediction[0][0], 1, 10)
+            )
+
+            star_rating = round(predicted_score) / 2
+
+            star_rating = max(
+                0.5,
+                min(5.0, star_rating)
+            )
+
+            ratings.append(star_rating)
+
+            st.write(
+                f"**Review {i + 1}:** "
+                f"⭐ {star_rating:.1f} / 5"
+            )
+
+        # ====================================================
+        # OVERALL RATING
+        # ====================================================
+
+        overall_rating = sum(ratings) / len(ratings)
+
+        overall_rating = round(
+            overall_rating * 2
+        ) / 2
+
+        st.divider()
+
+        st.subheader("🏆 Overall Movie Rating")
 
         st.write(
-            f"**Predicted IMDb Score:** "
-            f"{predicted_score:.2f} / 10"
+            f"# ⭐ {overall_rating:.1f} / 5"
         )
 
         st.write(
-            f"**Movie Rating:** "
-            f"⭐ {star_rating:.1f} / 5"
+            f"Based on {len(valid_reviews)} review(s)"
         )
 
 # ============================================================
