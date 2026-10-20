@@ -4,19 +4,11 @@ import pickle
 import re
 import requests
 
-# ============================================================
-# PAGE CONFIGURATION
-# ============================================================
-
 st.set_page_config(
     page_title="AI Movie Rating System",
     page_icon="🎬",
     layout="wide"
 )
-
-# ============================================================
-# CUSTOM STYLE
-# ============================================================
 
 st.markdown("""
 <style>
@@ -56,34 +48,29 @@ st.markdown("""
 .stars {
     font-size: 35px;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
-# ============================================================
-# LOAD MODEL
-# ============================================================
 
 @st.cache_resource
 def load_model():
     return tf.keras.models.load_model(
-        "movie_rating_bilstm_final.keras"
+        "movie_rating_bilstm.keras"
     )
+
 
 @st.cache_resource
 def load_tokenizer():
     with open(
-        "movie_rating_tokenizer_final.pkl",
+        "movie_rating_tokenizer.pkl",
         "rb"
     ) as f:
         return pickle.load(f)
 
+
 model = load_model()
 tokenizer = load_tokenizer()
 
-# ============================================================
-# TEXT CLEANING
-# ============================================================
 
 def clean_text(text):
     text = text.lower()
@@ -92,14 +79,11 @@ def clean_text(text):
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
-# ============================================================
-# MOVIE SEARCH - TMDB
-# ============================================================
 
 TMDB_API_KEY = st.secrets.get("TMDB_API_KEY", "")
 
-def search_movies(movie_name):
 
+def search_movies(movie_name):
     if not TMDB_API_KEY:
         return []
 
@@ -130,12 +114,8 @@ def search_movies(movie_name):
 
     return []
 
-# ============================================================
-# PREDICT RATING
-# ============================================================
 
 def predict_rating(review):
-
     cleaned = clean_text(review)
 
     sequence = tokenizer.texts_to_sequences(
@@ -156,7 +136,6 @@ def predict_rating(review):
 
     rating = float(prediction[0][0])
 
-    # Keep prediction between 1 and 5
     rating = max(
         1.0,
         min(5.0, rating)
@@ -164,12 +143,8 @@ def predict_rating(review):
 
     return rating
 
-# ============================================================
-# STAR DISPLAY
-# ============================================================
 
 def get_stars(rating):
-
     rounded_rating = round(
         rating * 2
     ) / 2
@@ -189,9 +164,6 @@ def get_stars(rating):
 
     return stars
 
-# ============================================================
-# HEADER
-# ============================================================
 
 st.markdown(
     '<div class="main-title">🎬 AI Movie Rating System</div>',
@@ -205,9 +177,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ============================================================
-# MOVIE SEARCH
-# ============================================================
 
 st.subheader("🎥 Search for a Movie")
 
@@ -218,12 +187,11 @@ movie_name = st.text_input(
 
 selected_movie = None
 
-if movie_name:
 
+if movie_name:
     movies = search_movies(movie_name)
 
     if movies:
-
         st.write("### Select a movie")
 
         display_movies = movies[:5]
@@ -241,7 +209,6 @@ if movie_name:
                 )
 
                 if poster_path:
-
                     poster_url = (
                         "https://image.tmdb.org/t/p/w500"
                         + poster_path
@@ -283,14 +250,10 @@ if movie_name:
                     st.session_state.selected_movie = movie
 
     else:
-
         st.warning(
             "Movie not found. Try another movie name."
         )
 
-# ============================================================
-# DISPLAY SELECTED MOVIE
-# ============================================================
 
 if "selected_movie" in st.session_state:
 
@@ -299,7 +262,6 @@ if "selected_movie" in st.session_state:
     )
 
     st.markdown("---")
-
     st.subheader("🎞️ Selected Movie")
 
     col1, col2 = st.columns(
@@ -336,6 +298,7 @@ if "selected_movie" in st.session_state:
         )
 
         if release_date:
+
             st.write(
                 f"📅 Release Date: {release_date}"
             )
@@ -345,6 +308,7 @@ if "selected_movie" in st.session_state:
         )
 
         if tmdb_rating:
+
             st.write(
                 f"⭐ TMDB Rating: {tmdb_rating:.1f}/10"
             )
@@ -358,13 +322,10 @@ if "selected_movie" in st.session_state:
             f"**Overview:** {overview}"
         )
 
-# ============================================================
-# REVIEW SECTION
-# ============================================================
 
 st.markdown("---")
-
 st.subheader("📝 Enter Movie Reviews")
+
 
 num_reviews = st.number_input(
     "Number of reviews",
@@ -374,7 +335,9 @@ num_reviews = st.number_input(
     step=1
 )
 
+
 reviews = []
+
 
 for i in range(num_reviews):
 
@@ -387,9 +350,6 @@ for i in range(num_reviews):
 
     reviews.append(review)
 
-# ============================================================
-# PREDICTION BUTTON
-# ============================================================
 
 if st.button(
     "🚀 Predict Movie Rating",
@@ -415,17 +375,10 @@ if st.button(
 
         for review in valid_reviews:
 
-            rating = predict_rating(
-                review
-            )
+            rating = predict_rating(review)
 
-            predictions.append(
-                rating
-            )
+            predictions.append(rating)
 
-        # ====================================================
-        # INDIVIDUAL RATINGS
-        # ====================================================
 
         st.markdown("---")
 
@@ -433,9 +386,11 @@ if st.button(
             "⭐ Individual Review Ratings"
         )
 
+
         result_columns = st.columns(
             min(3, len(predictions))
         )
+
 
         for i, rating in enumerate(
             predictions
@@ -469,23 +424,24 @@ if st.button(
                     "AI predicted rating"
                 )
 
-        # ====================================================
-        # OVERALL RATING
-        # ====================================================
 
         overall_rating = sum(
             predictions
         ) / len(predictions)
 
+
         overall_rating = (
             round(overall_rating * 2) / 2
         )
+
 
         overall_stars = get_stars(
             overall_rating
         )
 
+
         st.markdown("---")
+
 
         st.markdown(
             '<div class="rating-box">',
@@ -514,9 +470,6 @@ if st.button(
             unsafe_allow_html=True
         )
 
-# ============================================================
-# TMDB ATTRIBUTION
-# ============================================================
 
 st.markdown("---")
 
