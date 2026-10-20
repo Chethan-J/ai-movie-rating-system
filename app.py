@@ -4,9 +4,6 @@ import pickle
 import re
 import requests
 
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-
-
 # ============================================================
 # PAGE CONFIGURATION
 # ============================================================
@@ -17,84 +14,183 @@ st.set_page_config(
     layout="wide"
 )
 
-
 # ============================================================
-# CUSTOM UI
+# CUSTOM STYLE
 # ============================================================
 
 st.markdown("""
 <style>
-
 .stApp {
-    background: linear-gradient(
-        135deg,
-        #050b18 0%,
-        #0b1630 50%,
-        #111827 100%
-    );
+    background: linear-gradient(135deg, #0b1020, #151b35);
     color: white;
 }
 
-[data-testid="stHeader"] {
-    background: transparent;
-}
-
 .main-title {
-    font-size: 42px;
-    font-weight: 800;
     text-align: center;
+    font-size: 42px;
+    font-weight: bold;
     margin-bottom: 5px;
 }
 
 .subtitle {
     text-align: center;
-    color: #aab8d4;
-    font-size: 17px;
+    color: #b8c1ec;
+    font-size: 18px;
     margin-bottom: 30px;
 }
 
 .movie-card {
     padding: 20px;
     border-radius: 15px;
-    border: 1px solid #263b63;
-    background: rgba(13, 27, 51, 0.75);
-    margin-top: 15px;
-    margin-bottom: 30px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
 }
 
-.tmdb-note {
+.rating-box {
+    padding: 25px;
+    border-radius: 15px;
+    background: rgba(255,255,255,0.06);
     text-align: center;
-    color: #8998b5;
-    font-size: 13px;
-    margin-top: 30px;
 }
 
-.stTextInput input,
-.stTextArea textarea,
-.stNumberInput input {
-    background-color: #111c33 !important;
-    color: white !important;
-    border: 1px solid #36527d !important;
-    border-radius: 10px !important;
-}
-
-.stButton > button {
-    width: 100%;
-    border-radius: 10px;
-    border: none;
-    background: linear-gradient(90deg, #168cff, #7654ff);
-    color: white;
-    font-size: 16px;
-    font-weight: 600;
-    padding: 10px;
+.stars {
+    font-size: 35px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
+# ============================================================
+# LOAD MODEL
+# ============================================================
+
+@st.cache_resource
+def load_model():
+    return tf.keras.models.load_model(
+        "movie_rating_bilstm_final.keras"
+    )
+
+@st.cache_resource
+def load_tokenizer():
+    with open(
+        "movie_rating_tokenizer_final.pkl",
+        "rb"
+    ) as f:
+        return pickle.load(f)
+
+model = load_model()
+tokenizer = load_tokenizer()
 
 # ============================================================
-# TITLE
+# TEXT CLEANING
+# ============================================================
+
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r"<br />", " ", text)
+    text = re.sub(r"[^a-zA-Z\s]", "", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+# ============================================================
+# MOVIE SEARCH - TMDB
+# ============================================================
+
+TMDB_API_KEY = st.secrets.get("TMDB_API_KEY", "")
+
+def search_movies(movie_name):
+
+    if not TMDB_API_KEY:
+        return []
+
+    url = "https://api.themoviedb.org/3/search/movie"
+
+    params = {
+        "api_key": TMDB_API_KEY,
+        "query": movie_name,
+        "language": "en-US",
+        "include_adult": False
+    }
+
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            return response.json().get(
+                "results",
+                []
+            )
+
+    except:
+        return []
+
+    return []
+
+# ============================================================
+# PREDICT RATING
+# ============================================================
+
+def predict_rating(review):
+
+    cleaned = clean_text(review)
+
+    sequence = tokenizer.texts_to_sequences(
+        [cleaned]
+    )
+
+    padded = tf.keras.preprocessing.sequence.pad_sequences(
+        sequence,
+        maxlen=300,
+        padding="post",
+        truncating="post"
+    )
+
+    prediction = model.predict(
+        padded,
+        verbose=0
+    )
+
+    rating = float(prediction[0][0])
+
+    # Keep prediction between 1 and 5
+    rating = max(
+        1.0,
+        min(5.0, rating)
+    )
+
+    return rating
+
+# ============================================================
+# STAR DISPLAY
+# ============================================================
+
+def get_stars(rating):
+
+    rounded_rating = round(
+        rating * 2
+    ) / 2
+
+    full_stars = int(
+        rounded_rating
+    )
+
+    half_star = (
+        rounded_rating - full_stars == 0.5
+    )
+
+    stars = "⭐" * full_stars
+
+    if half_star:
+        stars += "½"
+
+    return stars
+
+# ============================================================
+# HEADER
 # ============================================================
 
 st.markdown(
@@ -104,262 +200,39 @@ st.markdown(
 
 st.markdown(
     '<div class="subtitle">'
-    'Analyze movie reviews using NLP and BiLSTM to predict ratings'
+    'Predict movie ratings using BiLSTM and NLP'
     '</div>',
     unsafe_allow_html=True
 )
 
-
 # ============================================================
-# LOAD MODEL
-# ============================================================
-
-@st.cache_resource
-def load_model():
-    return tf.keras.models.load_model(
-        "movie_rating_bilstm.keras"
-    )
-
-
-@st.cache_resource
-def load_tokenizer():
-    with open(
-        "movie_rating_tokenizer.pkl",
-        "rb"
-    ) as f:
-        return pickle.load(f)
-
-
-model = load_model()
-tokenizer = load_tokenizer()
-
-
-# ============================================================
-# TEXT CLEANING
+# MOVIE SEARCH
 # ============================================================
 
-def clean_text(text):
+st.subheader("🎥 Search for a Movie")
 
-    text = text.lower()
-
-    text = re.sub(
-        r"<br />",
-        " ",
-        text
-    )
-
-    text = re.sub(
-        r"[^a-zA-Z\s]",
-        "",
-        text
-    )
-
-    text = re.sub(
-        r"\s+",
-        " ",
-        text
-    )
-
-    return text.strip()
-
-
-# ============================================================
-# TMDB SEARCH
-# ============================================================
-
-def tmdb_search(query, page=1):
-
-    api_key = st.secrets["TMDB_API_KEY"]
-
-    url = "https://api.themoviedb.org/3/search/movie"
-
-    params = {
-        "api_key": api_key,
-        "query": query,
-        "page": page,
-        "include_adult": False
-    }
-
-    try:
-
-        response = requests.get(
-            url,
-            params=params,
-            timeout=10
-        )
-
-        if response.status_code == 200:
-            return response.json()
-
-    except Exception:
-
-        return None
-
-    return None
-
-
-# ============================================================
-# SEARCH MULTIPLE MOVIES
-# ============================================================
-
-def search_movies(movie_name):
-
-    movie_name = movie_name.strip()
-
-    if not movie_name:
-        return []
-
-    candidates = {}
-
-    # --------------------------------------------------------
-    # Search complete movie name
-    # --------------------------------------------------------
-
-    data = tmdb_search(movie_name)
-
-    if data:
-
-        for movie in data.get(
-            "results",
-            []
-        )[:10]:
-
-            movie_id = movie.get("id")
-
-            if movie_id:
-                candidates[movie_id] = movie
-
-
-    # --------------------------------------------------------
-    # Search individual words
-    # --------------------------------------------------------
-
-    words = movie_name.split()
-
-    for word in words:
-
-        if len(word) < 3:
-            continue
-
-        data = tmdb_search(word)
-
-        if data:
-
-            for movie in data.get(
-                "results",
-                []
-            )[:10]:
-
-                movie_id = movie.get("id")
-
-                if movie_id:
-                    candidates[movie_id] = movie
-
-
-    return list(
-        candidates.values()
-    )[:10]
-
-
-# ============================================================
-# SESSION STATE
-# ============================================================
-
-if "movie" not in st.session_state:
-    st.session_state.movie = None
-
-if "search_results" not in st.session_state:
-    st.session_state.search_results = []
-
-if "search_performed" not in st.session_state:
-    st.session_state.search_performed = False
-
-
-# ============================================================
-# FIND A MOVIE
-# ============================================================
-
-st.subheader("🔎 Find a Movie")
-
-search_col, button_col = st.columns(
-    [5, 1]
+movie_name = st.text_input(
+    "Enter movie name",
+    placeholder="Example: Bahubali"
 )
 
-with search_col:
+selected_movie = None
 
-    movie_name = st.text_input(
-        "Movie Name",
-        placeholder="Example: Interstellar or raj huli",
-        label_visibility="collapsed"
-    )
+if movie_name:
 
-with button_col:
+    movies = search_movies(movie_name)
 
-    search_clicked = st.button(
-        "🔍 Search",
-        use_container_width=True
-    )
+    if movies:
 
+        st.write("### Select a movie")
 
-# ============================================================
-# SEARCH
-# ============================================================
-
-if search_clicked:
-
-    if movie_name.strip() == "":
-
-        st.warning(
-            "Please enter a movie name."
-        )
-
-    else:
-
-        results = search_movies(
-            movie_name
-        )
-
-        st.session_state.search_results = results
-
-        st.session_state.search_performed = True
-
-        st.session_state.movie = None
-
-
-# ============================================================
-# SEARCH RESULTS
-# ============================================================
-
-if (
-    st.session_state.search_performed
-    and st.session_state.movie is None
-):
-
-    results = st.session_state.search_results
-
-    if len(results) == 0:
-
-        st.warning(
-            "No movies found. Try another movie name."
-        )
-
-    else:
-
-        st.markdown(
-            "### 🎬 Select Your Movie"
-        )
-
-        st.caption(
-            "Choose the movie you want to analyze."
-        )
-
-        results = results[:5]
+        display_movies = movies[:5]
 
         columns = st.columns(
-            len(results)
+            len(display_movies)
         )
 
-        for i, movie in enumerate(results):
+        for i, movie in enumerate(display_movies):
 
             with columns[i]:
 
@@ -379,15 +252,9 @@ if (
                         use_container_width=True
                     )
 
-                else:
-
-                    st.markdown(
-                        "🎬 Poster unavailable"
-                    )
-
                 title = movie.get(
                     "title",
-                    "Unknown Movie"
+                    "Unknown"
                 )
 
                 release_date = movie.get(
@@ -406,45 +273,44 @@ if (
                 )
 
                 st.caption(
-                    f"📅 {year}"
+                    f"Year: {year}"
                 )
 
                 if st.button(
                     "Select Movie",
-                    key=f"select_movie_{movie.get('id')}",
-                    use_container_width=True
+                    key=f"movie_{movie.get('id')}"
                 ):
+                    st.session_state.selected_movie = movie
 
-                    st.session_state.movie = movie
+    else:
 
-                    st.session_state.search_results = []
-
-                    st.rerun()
-
+        st.warning(
+            "Movie not found. Try another movie name."
+        )
 
 # ============================================================
-# SELECTED MOVIE
+# DISPLAY SELECTED MOVIE
 # ============================================================
 
-movie = st.session_state.movie
+if "selected_movie" in st.session_state:
 
-
-if movie is not None:
-
-    st.markdown(
-        '<div class="movie-card">',
-        unsafe_allow_html=True
+    selected_movie = (
+        st.session_state.selected_movie
     )
 
-    poster_path = movie.get(
-        "poster_path"
-    )
+    st.markdown("---")
 
-    movie_col1, movie_col2 = st.columns(
+    st.subheader("🎞️ Selected Movie")
+
+    col1, col2 = st.columns(
         [1, 2]
     )
 
-    with movie_col1:
+    with col1:
+
+        poster_path = selected_movie.get(
+            "poster_path"
+        )
 
         if poster_path:
 
@@ -458,350 +324,203 @@ if movie is not None:
                 use_container_width=True
             )
 
-        else:
+    with col2:
 
-            st.info(
-                "Poster not available."
+        st.markdown(
+            f"## {selected_movie.get('title', 'Unknown')}"
+        )
+
+        release_date = selected_movie.get(
+            "release_date",
+            ""
+        )
+
+        if release_date:
+            st.write(
+                f"📅 Release Date: {release_date}"
             )
 
-    with movie_col2:
-
-        title = movie.get(
-            "title",
-            "Unknown Movie"
+        tmdb_rating = selected_movie.get(
+            "vote_average"
         )
 
-        release_date = movie.get(
-            "release_date",
-            "Unknown"
-        )
+        if tmdb_rating:
+            st.write(
+                f"⭐ TMDB Rating: {tmdb_rating:.1f}/10"
+            )
 
-        overview = movie.get(
+        overview = selected_movie.get(
             "overview",
-            "No description available."
-        )
-
-        tmdb_rating = movie.get(
-            "vote_average",
-            0
-        )
-
-        st.markdown(
-            f"## 🎬 {title}"
-        )
-
-        st.markdown(
-            f"**Release Date:** {release_date}"
-        )
-
-        st.markdown(
-            f"**TMDB Rating:** ⭐ "
-            f"{tmdb_rating}/10"
+            "No overview available."
         )
 
         st.write(
-            overview
+            f"**Overview:** {overview}"
         )
 
-    st.markdown(
-        "</div>",
-        unsafe_allow_html=True
+# ============================================================
+# REVIEW SECTION
+# ============================================================
+
+st.markdown("---")
+
+st.subheader("📝 Enter Movie Reviews")
+
+num_reviews = st.number_input(
+    "Number of reviews",
+    min_value=1,
+    max_value=10,
+    value=3,
+    step=1
+)
+
+reviews = []
+
+for i in range(num_reviews):
+
+    review = st.text_area(
+        f"Review {i + 1}",
+        placeholder="Write your movie review here...",
+        height=120,
+        key=f"review_{i}"
     )
 
+    reviews.append(review)
 
-    # ========================================================
-    # REVIEW INPUT
-    # ========================================================
+# ============================================================
+# PREDICTION BUTTON
+# ============================================================
 
-    st.subheader(
-        "📝 Enter Movie Reviews"
-    )
+if st.button(
+    "🚀 Predict Movie Rating",
+    type="primary",
+    use_container_width=True
+):
 
-    review_count = st.number_input(
-        "Number of Reviews",
-        min_value=1,
-        max_value=10,
-        value=3,
-        step=1
-    )
+    valid_reviews = [
+        review.strip()
+        for review in reviews
+        if review.strip()
+    ]
 
-    reviews = []
+    if not valid_reviews:
 
-    for row_start in range(
-        0,
-        review_count,
-        3
-    ):
-
-        row_count = min(
-            3,
-            review_count - row_start
+        st.warning(
+            "Please enter at least one review."
         )
 
-        cols = st.columns(
-            row_count
+    else:
+
+        predictions = []
+
+        for review in valid_reviews:
+
+            rating = predict_rating(
+                review
+            )
+
+            predictions.append(
+                rating
+            )
+
+        # ====================================================
+        # INDIVIDUAL RATINGS
+        # ====================================================
+
+        st.markdown("---")
+
+        st.subheader(
+            "⭐ Individual Review Ratings"
         )
 
-        for i in range(
-            row_count
+        result_columns = st.columns(
+            min(3, len(predictions))
+        )
+
+        for i, rating in enumerate(
+            predictions
         ):
 
-            index = row_start + i + 1
+            with result_columns[
+                i % len(result_columns)
+            ]:
 
-            with cols[i]:
-
-                review = st.text_area(
-                    f"Review {index}",
-                    placeholder=(
-                        "Enter your movie review..."
-                    ),
-                    height=160,
-                    key=f"review_{index}"
+                display_rating = (
+                    round(rating * 2) / 2
                 )
 
-                reviews.append(
-                    review
+                stars = get_stars(
+                    display_rating
                 )
 
-
-    # ========================================================
-    # ANALYZE REVIEWS
-    # ========================================================
-
-    analyze_clicked = st.button(
-        "🎯 Analyze Reviews",
-        use_container_width=True
-    )
-
-
-    # ========================================================
-    # PREDICTION
-    # ========================================================
-
-    if analyze_clicked:
-
-        valid_reviews = [
-            review
-            for review in reviews
-            if review.strip()
-        ]
-
-        if len(valid_reviews) == 0:
-
-            st.warning(
-                "Please enter at least one review."
-            )
-
-        else:
-
-            predictions = []
-
-            for review in valid_reviews:
-
-                # --------------------------------------------
-                # Clean review
-                # --------------------------------------------
-
-                cleaned = clean_text(
-                    review
+                st.markdown(
+                    f"### Review {i + 1}"
                 )
 
-                # --------------------------------------------
-                # Convert text to sequence
-                # --------------------------------------------
-
-                sequence = (
-                    tokenizer.texts_to_sequences(
-                        [cleaned]
-                    )
+                st.markdown(
+                    f"## {stars}"
                 )
 
-                # --------------------------------------------
-                # Padding
-                # --------------------------------------------
-
-                padded = pad_sequences(
-                    sequence,
-                    maxlen=200,
-                    padding="post",
-                    truncating="post"
+                st.markdown(
+                    f"### {display_rating:.1f} / 5"
                 )
 
-                # --------------------------------------------
-                # Model prediction
-                # --------------------------------------------
-
-                predicted_score = float(
-                    model.predict(
-                        padded,
-                        verbose=0
-                    )[0][0]
+                st.caption(
+                    "AI predicted rating"
                 )
 
-                # --------------------------------------------
-                # Keep prediction between 1 and 10
-                # --------------------------------------------
+        # ====================================================
+        # OVERALL RATING
+        # ====================================================
 
-                predicted_score = max(
-                    1.0,
-                    min(
-                        10.0,
-                        predicted_score
-                    )
-                )
+        overall_rating = sum(
+            predictions
+        ) / len(predictions)
 
-                # --------------------------------------------
-                # Convert 1-10 to 0.5-5 stars
-                # --------------------------------------------
+        overall_rating = (
+            round(overall_rating * 2) / 2
+        )
 
-                star_rating = (
-                    round(predicted_score) / 2
-                )
+        overall_stars = get_stars(
+            overall_rating
+        )
 
-                star_rating = max(
-                    0.5,
-                    min(
-                        5.0,
-                        star_rating
-                    )
-                )
+        st.markdown("---")
 
-                predictions.append(
-                    star_rating
-                )
+        st.markdown(
+            '<div class="rating-box">',
+            unsafe_allow_html=True
+        )
 
+        st.markdown(
+            "## 🎯 Overall AI Rating"
+        )
 
-            # ====================================================
-            # INDIVIDUAL REVIEW RATINGS
-            # ====================================================
+        st.markdown(
+            f'<div class="stars">{overall_stars}</div>',
+            unsafe_allow_html=True
+        )
 
-            st.subheader(
-                "⭐ Individual Review Ratings"
-            )
+        st.markdown(
+            f"# {overall_rating:.1f} / 5"
+        )
 
-            result_columns = st.columns(
-                min(
-                    3,
-                    len(predictions)
-                )
-            )
+        st.caption(
+            f"Based on {len(predictions)} review(s)"
+        )
 
-            for i, rating in enumerate(
-                predictions
-            ):
-
-                with result_columns[
-                    i % len(result_columns)
-                ]:
-
-                    full_stars = int(
-                        rating
-                    )
-
-                    half_star = (
-                        rating % 1 == 0.5
-                    )
-
-                    stars = (
-                        "⭐" * full_stars
-                    )
-
-                    if half_star:
-                        stars += "½"
-
-                    st.markdown(
-                        f"### Review {i + 1}"
-                    )
-
-                    st.markdown(
-                        f"## {stars}"
-                    )
-
-                    st.markdown(
-                        f"### {rating:.1f} / 5"
-                    )
-
-                    st.caption(
-                        "AI predicted rating"
-                    )
-
-
-            # ====================================================
-            # OVERALL RATING
-            # ====================================================
-
-            overall_rating = (
-                sum(predictions)
-                / len(predictions)
-            )
-
-            # Round to nearest half star
-            overall_rating = round(
-                overall_rating * 2
-            ) / 2
-
-            overall_rating = max(
-                0.5,
-                min(
-                    5.0,
-                    overall_rating
-                )
-            )
-
-
-            # ====================================================
-            # OVERALL STARS
-            # ====================================================
-
-            full_stars = int(
-                overall_rating
-            )
-
-            half_star = (
-                overall_rating % 1 == 0.5
-            )
-
-            overall_stars = (
-                "⭐" * full_stars
-            )
-
-            if half_star:
-                overall_stars += "½"
-
-
-            # ====================================================
-            # OVERALL RESULT
-            # ============================================================
-
-            st.markdown("---")
-
-            st.markdown(
-                "## 🎯 Overall AI Rating"
-            )
-
-            st.markdown(
-                f"# {overall_rating:.1f} / 5"
-            )
-
-            st.markdown(
-                f"### {overall_stars}"
-            )
-
-            st.caption(
-                f"Based on {len(predictions)} review(s)"
-            )
-
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
+        )
 
 # ============================================================
 # TMDB ATTRIBUTION
 # ============================================================
 
-st.markdown(
-    """
-    <div class="tmdb-note">
-        This product uses the TMDB API but is not endorsed
-        or certified by TMDB.
-    </div>
-    """,
-    unsafe_allow_html=True
+st.markdown("---")
+
+st.caption(
+    "This product uses the TMDB API but is not endorsed "
+    "or certified by TMDB."
 )
