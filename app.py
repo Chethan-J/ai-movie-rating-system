@@ -437,8 +437,8 @@ st.subheader(
 num_reviews = st.number_input(
     "Number of reviews",
     min_value=1,
-    max_value=10,
-    value=3,
+    max_value=500,
+    value=1,
     step=1
 )
 
