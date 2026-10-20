@@ -31,13 +31,6 @@ st.markdown("""
     margin-bottom: 30px;
 }
 
-.movie-card {
-    padding: 20px;
-    border-radius: 15px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.1);
-}
-
 .rating-box {
     padding: 25px;
     border-radius: 15px;
@@ -47,6 +40,30 @@ st.markdown("""
 
 .stars {
     font-size: 35px;
+}
+
+/* Make input text visible */
+[data-baseweb="input"] input {
+    color: #111111 !important;
+    caret-color: #111111 !important;
+}
+
+[data-baseweb="textarea"] textarea {
+    color: #111111 !important;
+    caret-color: #111111 !important;
+}
+
+/* Placeholder text */
+[data-baseweb="input"] input::placeholder,
+[data-baseweb="textarea"] textarea::placeholder {
+    color: #666666 !important;
+}
+
+/* Make labels visible */
+.stTextInput label,
+.stTextArea label,
+.stNumberInput label {
+    color: white !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -178,6 +195,10 @@ st.markdown(
 )
 
 
+# ============================================================
+# MOVIE SEARCH
+# ============================================================
+
 st.subheader("🎥 Search for a Movie")
 
 movie_name = st.text_input(
@@ -185,13 +206,14 @@ movie_name = st.text_input(
     placeholder="Example: Bahubali"
 )
 
-selected_movie = None
 
+# Show movie suggestions ONLY when no movie is selected
+if movie_name and "selected_movie" not in st.session_state:
 
-if movie_name:
     movies = search_movies(movie_name)
 
     if movies:
+
         st.write("### Select a movie")
 
         display_movies = movies[:5]
@@ -209,6 +231,7 @@ if movie_name:
                 )
 
                 if poster_path:
+
                     poster_url = (
                         "https://image.tmdb.org/t/p/w500"
                         + poster_path
@@ -247,13 +270,21 @@ if movie_name:
                     "Select Movie",
                     key=f"movie_{movie.get('id')}"
                 ):
+
                     st.session_state.selected_movie = movie
 
+                    st.rerun()
+
     else:
+
         st.warning(
             "Movie not found. Try another movie name."
         )
 
+
+# ============================================================
+# SELECTED MOVIE
+# ============================================================
 
 if "selected_movie" in st.session_state:
 
@@ -262,6 +293,7 @@ if "selected_movie" in st.session_state:
     )
 
     st.markdown("---")
+
     st.subheader("🎞️ Selected Movie")
 
     col1, col2 = st.columns(
@@ -322,8 +354,22 @@ if "selected_movie" in st.session_state:
             f"**Overview:** {overview}"
         )
 
+    # Change movie button
+    if st.button(
+        "🔄 Change Movie"
+    ):
+
+        del st.session_state.selected_movie
+
+        st.rerun()
+
+
+# ============================================================
+# REVIEWS
+# ============================================================
 
 st.markdown("---")
+
 st.subheader("📝 Enter Movie Reviews")
 
 
@@ -350,6 +396,10 @@ for i in range(num_reviews):
 
     reviews.append(review)
 
+
+# ============================================================
+# PREDICTION
+# ============================================================
 
 if st.button(
     "🚀 Predict Movie Rating",
@@ -425,15 +475,15 @@ if st.button(
                 )
 
 
+        # Overall rating
+
         overall_rating = sum(
             predictions
         ) / len(predictions)
 
-
         overall_rating = (
             round(overall_rating * 2) / 2
         )
-
 
         overall_stars = get_stars(
             overall_rating
@@ -470,6 +520,10 @@ if st.button(
             unsafe_allow_html=True
         )
 
+
+# ============================================================
+# TMDB ATTRIBUTION
+# ============================================================
 
 st.markdown("---")
 
