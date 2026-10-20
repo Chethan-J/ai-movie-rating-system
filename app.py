@@ -42,21 +42,19 @@ st.markdown("""
     font-size: 35px;
 }
 
-/* Make input text visible */
-[data-baseweb="input"] input {
+/* Make all typed text visible */
+input,
+textarea {
     color: #111111 !important;
-    caret-color: #111111 !important;
-}
-
-[data-baseweb="textarea"] textarea {
-    color: #111111 !important;
+    -webkit-text-fill-color: #111111 !important;
     caret-color: #111111 !important;
 }
 
 /* Placeholder text */
-[data-baseweb="input"] input::placeholder,
-[data-baseweb="textarea"] textarea::placeholder {
+input::placeholder,
+textarea::placeholder {
     color: #666666 !important;
+    -webkit-text-fill-color: #666666 !important;
 }
 
 /* Make labels visible */
@@ -65,9 +63,26 @@ st.markdown("""
 .stNumberInput label {
     color: white !important;
 }
+
+/* Movie selection and other buttons */
+.stButton > button {
+    color: #111111 !important;
+    background-color: white !important;
+    border: none !important;
+    font-weight: 600 !important;
+}
+
+.stButton > button:hover {
+    background-color: #e6e6e6 !important;
+    color: #111111 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
+
+# ============================================================
+# LOAD MODEL
+# ============================================================
 
 @st.cache_resource
 def load_model():
@@ -89,6 +104,10 @@ model = load_model()
 tokenizer = load_tokenizer()
 
 
+# ============================================================
+# TEXT CLEANING
+# ============================================================
+
 def clean_text(text):
     text = text.lower()
     text = re.sub(r"<br />", " ", text)
@@ -97,10 +116,18 @@ def clean_text(text):
     return text.strip()
 
 
-TMDB_API_KEY = st.secrets.get("TMDB_API_KEY", "")
+# ============================================================
+# TMDB API
+# ============================================================
+
+TMDB_API_KEY = st.secrets.get(
+    "TMDB_API_KEY",
+    ""
+)
 
 
 def search_movies(movie_name):
+
     if not TMDB_API_KEY:
         return []
 
@@ -114,6 +141,7 @@ def search_movies(movie_name):
     }
 
     try:
+
         response = requests.get(
             url,
             params=params,
@@ -121,18 +149,25 @@ def search_movies(movie_name):
         )
 
         if response.status_code == 200:
+
             return response.json().get(
                 "results",
                 []
             )
 
     except:
+
         return []
 
     return []
 
 
+# ============================================================
+# PREDICT RATING
+# ============================================================
+
 def predict_rating(review):
+
     cleaned = clean_text(review)
 
     sequence = tokenizer.texts_to_sequences(
@@ -151,7 +186,9 @@ def predict_rating(review):
         verbose=0
     )
 
-    rating = float(prediction[0][0])
+    rating = float(
+        prediction[0][0]
+    )
 
     rating = max(
         1.0,
@@ -161,7 +198,12 @@ def predict_rating(review):
     return rating
 
 
+# ============================================================
+# STAR DISPLAY
+# ============================================================
+
 def get_stars(rating):
+
     rounded_rating = round(
         rating * 2
     ) / 2
@@ -182,8 +224,14 @@ def get_stars(rating):
     return stars
 
 
+# ============================================================
+# TITLE
+# ============================================================
+
 st.markdown(
-    '<div class="main-title">🎬 AI Movie Rating System</div>',
+    '<div class="main-title">'
+    '🎬 AI Movie Rating System'
+    '</div>',
     unsafe_allow_html=True
 )
 
@@ -207,10 +255,19 @@ movie_name = st.text_input(
 )
 
 
-# Show movie suggestions ONLY when no movie is selected
-if movie_name and "selected_movie" not in st.session_state:
+# ============================================================
+# SHOW MOVIE SUGGESTIONS
+# ONLY WHEN NO MOVIE IS SELECTED
+# ============================================================
 
-    movies = search_movies(movie_name)
+if (
+    movie_name
+    and "selected_movie" not in st.session_state
+):
+
+    movies = search_movies(
+        movie_name
+    )
 
     if movies:
 
@@ -222,7 +279,9 @@ if movie_name and "selected_movie" not in st.session_state:
             len(display_movies)
         )
 
-        for i, movie in enumerate(display_movies):
+        for i, movie in enumerate(
+            display_movies
+        ):
 
             with columns[i]:
 
@@ -294,7 +353,9 @@ if "selected_movie" in st.session_state:
 
     st.markdown("---")
 
-    st.subheader("🎞️ Selected Movie")
+    st.subheader(
+        "🎞️ Selected Movie"
+    )
 
     col1, col2 = st.columns(
         [1, 2]
@@ -354,7 +415,6 @@ if "selected_movie" in st.session_state:
             f"**Overview:** {overview}"
         )
 
-    # Change movie button
     if st.button(
         "🔄 Change Movie"
     ):
@@ -370,8 +430,9 @@ if "selected_movie" in st.session_state:
 
 st.markdown("---")
 
-st.subheader("📝 Enter Movie Reviews")
-
+st.subheader(
+    "📝 Enter Movie Reviews"
+)
 
 num_reviews = st.number_input(
     "Number of reviews",
@@ -381,9 +442,7 @@ num_reviews = st.number_input(
     step=1
 )
 
-
 reviews = []
-
 
 for i in range(num_reviews):
 
@@ -394,11 +453,13 @@ for i in range(num_reviews):
         key=f"review_{i}"
     )
 
-    reviews.append(review)
+    reviews.append(
+        review
+    )
 
 
 # ============================================================
-# PREDICTION
+# PREDICT BUTTON
 # ============================================================
 
 if st.button(
@@ -425,10 +486,18 @@ if st.button(
 
         for review in valid_reviews:
 
-            rating = predict_rating(review)
+            rating = predict_rating(
+                review
+            )
 
-            predictions.append(rating)
+            predictions.append(
+                rating
+            )
 
+
+        # ====================================================
+        # INDIVIDUAL RATINGS
+        # ====================================================
 
         st.markdown("---")
 
@@ -436,11 +505,12 @@ if st.button(
             "⭐ Individual Review Ratings"
         )
 
-
         result_columns = st.columns(
-            min(3, len(predictions))
+            min(
+                3,
+                len(predictions)
+            )
         )
-
 
         for i, rating in enumerate(
             predictions
@@ -451,7 +521,9 @@ if st.button(
             ]:
 
                 display_rating = (
-                    round(rating * 2) / 2
+                    round(
+                        rating * 2
+                    ) / 2
                 )
 
                 stars = get_stars(
@@ -475,23 +547,26 @@ if st.button(
                 )
 
 
-        # Overall rating
-
-        overall_rating = sum(
-            predictions
-        ) / len(predictions)
+        # ====================================================
+        # OVERALL RATING
+        # ====================================================
 
         overall_rating = (
-            round(overall_rating * 2) / 2
+            sum(predictions)
+            / len(predictions)
+        )
+
+        overall_rating = (
+            round(
+                overall_rating * 2
+            ) / 2
         )
 
         overall_stars = get_stars(
             overall_rating
         )
 
-
         st.markdown("---")
-
 
         st.markdown(
             '<div class="rating-box">',
@@ -503,7 +578,9 @@ if st.button(
         )
 
         st.markdown(
-            f'<div class="stars">{overall_stars}</div>',
+            f'<div class="stars">'
+            f'{overall_stars}'
+            f'</div>',
             unsafe_allow_html=True
         )
 
